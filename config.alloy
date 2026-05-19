@@ -1,0 +1,77 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// RestoHub — Grafana Alloy config
+// Scraping de los 7 microservicios → Grafana Cloud (Hosted Prometheus)
+// ─────────────────────────────────────────────────────────────────────────────
+
+prometheus.scrape "restohub_services" {
+  targets = [
+    {
+      "__address__" = "restohub-menu-service.onrender.com",
+      "job"         = "menu_service",
+    },
+    {
+      "__address__" = "restohub-staff-service.onrender.com",
+      "job"         = "staff_service",
+    },
+    {
+      "__address__" = "restohub-order-service.onrender.com",
+      "job"         = "order_service",
+    },
+    {
+      "__address__" = "restohub-inventory-service.onrender.com",
+      "job"         = "inventory_service",
+    },
+    {
+      "__address__" = "restohub-loyalty-service.onrender.com",
+      "job"         = "loyalty_service",
+    },
+    {
+      "__address__" = "restohub-auth-service.onrender.com",
+      "job"         = "auth_service",
+    },
+    {
+      "__address__" = "restohub-gateway-service.onrender.com",
+      "job"         = "gateway_service",
+    },
+  ]
+
+  metrics_path    = "/metrics"
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+  scheme          = "https"
+
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+// ── Remote write → Grafana Cloud ─────────────────────────────────────────────
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    name = "hosted-prometheus"
+    url  = "https://prometheus-prod-66-prod-us-east-3.grafana.net/api/prom/push"
+
+    basic_auth {
+      username = "3232008"
+      password = env("GRAFANA_CLOUD_TOKEN")
+    }
+
+    queue_config {
+      max_samples_per_send = 1000
+      batch_send_deadline  = "5s"
+      min_backoff          = "30ms"
+      max_backoff          = "5s"
+    }
+  }
+}
+
+// ── Self-monitoring de Alloy ──────────────────────────────────────────────────
+
+prometheus.scrape "alloy_self" {
+  targets = [{
+    "__address__" = "localhost:12345",
+    "job"         = "alloy",
+  }]
+  metrics_path    = "/metrics"
+  scrape_interval = "60s"
+  forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
